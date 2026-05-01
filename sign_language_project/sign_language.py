@@ -88,7 +88,7 @@ def recognize_letter(fingers):
         return 's'
     elif fingers == [0, 0, 1, 0, 1]:
         return 't'
-    elif filters == [0, 0, 1, 1, 0]:
+    elif fingers == [0, 0, 1, 1, 0]:
         return 'u'
     elif fingers == [0, 0, 1, 1, 1]:
         return 'v'
