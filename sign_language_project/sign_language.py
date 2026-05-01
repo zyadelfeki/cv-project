@@ -9,12 +9,10 @@ cap = cv2.VideoCapture(0)
 
 def fingers_up(landmarks):
     fingers = []
-    # thumb
     if landmarks[4].x < landmarks[3].x:
         fingers.append(1)
     else:
         fingers.append(0)
-    # fingers
     tips = [8, 12, 16, 20]
     bases = [6, 10, 14, 18]
     for tip, base in zip(tips, bases):
@@ -53,7 +51,7 @@ def recognize_letter(fingers):
         return 'm'
     elif fingers == [1, 1, 1, 1, 1]:
         return 'n'
-    elif fingers == [0, 1, 0, 0, 0]:
+    elif fingers == [0, 1, 0, 0, 1]:
         return 'o'
     elif fingers == [1, 1, 0, 0, 1]:
         return 'p'
@@ -73,7 +71,7 @@ def recognize_letter(fingers):
         return 'w'
     elif fingers == [0, 1, 1, 1, 0]:
         return 'x'
-    elif fingers == [1, 0, 0, 0, 1]:
+    elif fingers == [1, 0, 0, 0, 0]:
         return 'y'
     elif fingers == [1, 0, 0, 1, 0]:
         return 'z'
