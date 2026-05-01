@@ -1,22 +1,47 @@
 import cv2
 import mediapipe as mp
+import urllib.request
+import os
 
-mp_hands = mp.solutions.hands
-hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5, min_tracking_confidence=0.5)
-mp_draw = mp.solutions.drawing_utils
+model_path = "hand_landmarker.task"
+if not os.path.exists(model_path):
+    urllib.request.urlretrieve(
+        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+        model_path
+    )
+
+base_options = mp.tasks.BaseOptions(model_asset_path=model_path)
+options = mp.tasks.vision.HandLandmarkerOptions(
+    base_options=base_options,
+    running_mode=mp.tasks.vision.RunningMode.VIDEO,
+    num_hands=1,
+    min_hand_detection_confidence=0.5,
+    min_tracking_confidence=0.5
+)
+detector = mp.tasks.vision.HandLandmarker.create_from_options(options)
+
+connections = [
+    (0,1),(1,2),(2,3),(3,4),
+    (0,5),(5,6),(6,7),(7,8),
+    (5,9),(9,10),(10,11),(11,12),
+    (9,13),(13,14),(14,15),(15,16),
+    (13,17),(17,18),(18,19),(19,20),
+    (0,17)
+]
 
 cap = cv2.VideoCapture(0)
+timestamp = 0
 
-def fingers_up(landmarks):
+def fingers_up(lm):
     fingers = []
-    if landmarks[4].x < landmarks[3].x:
+    if lm[4].x < lm[3].x:
         fingers.append(1)
     else:
         fingers.append(0)
     tips = [8, 12, 16, 20]
     bases = [6, 10, 14, 18]
     for tip, base in zip(tips, bases):
-        if landmarks[tip].y < landmarks[base].y:
+        if lm[tip].y < lm[base].y:
             fingers.append(1)
         else:
             fingers.append(0)
@@ -53,7 +78,7 @@ def recognize_letter(fingers):
         return 'n'
     elif fingers == [1, 1, 1, 1, 1]:
         return 'o'
-    elif fingers == [1, 1, 0, 0, 1]:
+    elif fingers == [1, 0, 1, 0, 0]:
         return 'p'
     elif fingers == [1, 1, 0, 1, 1]:
         return 'q'
@@ -63,7 +88,7 @@ def recognize_letter(fingers):
         return 's'
     elif fingers == [0, 0, 1, 0, 1]:
         return 't'
-    elif fingers == [0, 0, 1, 1, 0]:
+    elif filters == [0, 0, 1, 1, 0]:
         return 'u'
     elif fingers == [0, 0, 1, 1, 1]:
         return 'v'
@@ -87,30 +112,35 @@ while True:
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     frame_blur = cv2.GaussianBlur(frame_rgb, (5, 5), 0)
 
-    results = hands.process(frame_blur)
+    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_blur)
+    result = detector.detect_for_video(mp_image, timestamp)
+    timestamp += 1
 
-    if results.multi_hand_landmarks:
-        for hand_landmarks in results.multi_hand_landmarks:
-            mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+    if result.hand_landmarks:
+        for hand in result.hand_landmarks:
+            h, w, _ = frame.shape
 
-            h, w, c = frame.shape
             x_min = w
             y_min = h
             x_max = 0
             y_max = 0
-            for lm in hand_landmarks.landmark:
-                x, y = int(lm.x * w), int(lm.y * h)
-                if x < x_min:
-                    x_min = x
-                if y < y_min:
-                    y_min = y
-                if x > x_max:
-                    x_max = x
-                if y > y_max:
-                    y_max = y
+
+            coords = []
+            for lm in hand:
+                cx, cy = int(lm.x * w), int(lm.y * h)
+                coords.append((cx, cy))
+                cv2.circle(frame, (cx, cy), 5, (0, 255, 0), -1)
+                if cx < x_min: x_min = cx
+                if cy < y_min: y_min = cy
+                if cx > x_max: x_max = cx
+                if cy > y_max: y_max = cy
+
+            for start, end in connections:
+                cv2.line(frame, coords[start], coords[end], (255, 0, 0), 2)
+
             cv2.rectangle(frame, (x_min - 20, y_min - 20), (x_max + 20, y_max + 20), (0, 255, 0), 2)
 
-            fingers = fingers_up(hand_landmarks.landmark)
+            fingers = fingers_up(hand)
             letter = recognize_letter(fingers)
             cv2.putText(frame, letter, (x_min, y_min - 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
